@@ -9,9 +9,9 @@ export interface ObjectConstructor {
   assign(...objects: Object[]): Object;
 }
 
-declare var getAddressFromArrayBuffer: (ptr: bigint, size: bigint) => ArrayBuffer;
+declare var getArrayBufferFromAddress: (ptr: bigint, size: bigint) => ArrayBuffer;
 
-declare var getArrayBufferFromAddress: (data: ArrayBuffer) => bigint;
+declare var getAddressFromArrayBuffer: (data: ArrayBuffer) => bigint;
 
 declare var dereferenceBigInt: (obj: bigint) => bigint;
 

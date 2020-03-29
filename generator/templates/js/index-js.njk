@@ -23,16 +23,8 @@ const VK_ENUMERATIONS = nvk.$getVulkanEnumerations();
 const getAddressFromArrayBuffer = nvk.getAddressFromArrayBuffer;
 const getArrayBufferFromAddress = nvk.getArrayBufferFromAddress;
 
-global.ArrayBuffer.prototype.getAddress = function() {
-  return getAddressFromArrayBuffer(this);
-};
-
-global.ArrayBuffer.fromAddress = function(address, byteLength) {
-  return getArrayBufferFromAddress(address, BigInt(byteLength));
-};
-
-global.BigInt.prototype.dereference = function() {
-  return new BigUint64Array(ArrayBuffer.fromAddress(this, BI8))[0];
+const dereferenceBigInt = function(obj) {
+  return new BigUint64Array(ArrayBuffer.fromAddress(obj, BI8))[0];
 };
 
 const textEncoder = new (typeof TextEncoder === "undefined" ? require("util").TextEncoder : TextEncoder);

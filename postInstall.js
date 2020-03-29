@@ -1,5 +1,7 @@
 const fs = require('fs');
-const vkversion = '1.1.126';
+const pkg = require("./package.json");
+
+const vkversion = pkg.config.POST_DEFAULT_BINDING_VERSION;
 
 try {
   fs.unlinkSync('./platform-types');

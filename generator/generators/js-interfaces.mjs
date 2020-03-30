@@ -944,6 +944,10 @@ export default function(astReference, includeValidations, disableMinification, c
   output += `  VK_API_VERSION_1_1: nvk.VK_API_VERSION_1_1,\n`;
   output += `  vkUseDevice: nvk.vkUseDevice,\n`;
   output += `  vkUseInstance: nvk.vkUseInstance,\n`;
+  // add util funcs
+  output += `  getArrayBufferFromAddress: getArrayBufferFromAddress,\n`;
+  output += `  getAddressFromArrayBuffer: getAddressFromArrayBuffer,\n`;
+  output += `  dereferenceBigInt: dereferenceBigInt,\n`;
   // add VulkanWindow
   output += `  VulkanWindow: nvk.VulkanWindow,\n`;
   calls.map(call => {

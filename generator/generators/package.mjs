@@ -4,6 +4,7 @@
 
 **/
 import fs from "fs";
+import path from "path";
 import nunjucks from "nunjucks";
 import pkg from "../../package.json";
 
@@ -17,12 +18,16 @@ const PKG_TEMPLATE = fs.readFileSync(`${pkg.config.TEMPLATE_DIR}/package-json.nj
 
 nunjucks.configure({ autoescape: true });
 
+function normalizeJSONPath(path) {
+  return path.split(String.fromCharCode(92)).join(String.fromCharCode(92,92))
+}
+
 export default function(astReference, VK_VERSION) {
   ast = astReference;
   let vars = {
     VK_VERSION,
     NVK_VERSION: pkg.version,
-    SDK_PATH: resolveLunarVkSDKPath(VK_VERSION)
+    SDK_PATH: normalizeJSONPath(path.normalize(resolveLunarVkSDKPath(VK_VERSION)))
   };
   let out = {
     json: null

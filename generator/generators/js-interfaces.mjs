@@ -722,6 +722,7 @@ function getFlusherProcessor(member) {
       let {length} = member;
       let isNumber = Number.isInteger(parseInt(length));
       let instr = getDataViewInstruction(member);
+      let byteStride = getDataViewInstructionStride(instr);
       return `
   if (this._${member.name} !== null) {
     let array = this._${member.name};
@@ -739,7 +740,7 @@ function getFlusherProcessor(member) {
       }
     };` : `` }
     for (let ii = 0; ii < array.length; ++ii) {
-      this.memoryView.set${instr}(${offset} + ii, array[ii], ${endianess});
+      this.memoryView.set${instr}(${offset} + (ii * ${byteStride}), array[ii], ${endianess});
     };
   } else {
     ${!currentStruct.isUnionType ? `this.memoryView.set${instr}(${offset}, 0x0, ${endianess});` : ``}
@@ -942,6 +943,7 @@ export default function(astReference, includeValidations, disableMinification, c
   output += `  VK_VERSION_PATCH: nvk.VK_VERSION_PATCH,\n`;
   output += `  VK_API_VERSION_1_0: nvk.VK_API_VERSION_1_0,\n`;
   output += `  VK_API_VERSION_1_1: nvk.VK_API_VERSION_1_1,\n`;
+  output += `  VK_API_VERSION_1_2: nvk.VK_API_VERSION_1_2,\n`;
   output += `  vkUseDevice: nvk.vkUseDevice,\n`;
   output += `  vkUseInstance: nvk.vkUseInstance,\n`;
   // add util funcs

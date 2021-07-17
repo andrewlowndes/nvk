@@ -217,6 +217,7 @@ export function getAutoStructureType(name) {
   out += values.join(`_`).toUpperCase();
   // manual spelling fix ups
   out = out.replace(/(INT_8)/gm, `INT8`);
+  out = out.replace(/(INT_64)/gm, `INT64`);
   out = out.replace(/(FLOAT_16)/gm, `FLOAT16`);
   out = out.replace(/(_BIT)/gm, `BIT`);
   out = out.replace(/(WIN_32)/gm, `WIN32`);
@@ -508,6 +509,7 @@ export function isReferenceableMember(member) {
     case "LPCWSTR":
     case "const char *":
     case "const char * const*":
+    case "const uint32_t * const*":
       return true;
     case "float *":
     case "double *":
@@ -580,7 +582,8 @@ export function isArrayOfObjectsMember(member) {
 export function isHeaderHeapVector(member) {
   return (
     isArrayOfObjectsMember(member) ||
-    member.rawType === "const char * const*"
+    member.rawType === "const char * const*" ||
+    member.rawType === "const uint32_t * const*"
   );
 };
 

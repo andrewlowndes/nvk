@@ -17,6 +17,3 @@ This is no longer the case, instead the following methods can be imported from n
 - getAddressFromArrayBuffer
 - getArrayBufferFromAddress
 - dereferenceBigInt
-
-### Upcoming changes
-Update Vulkan API version to 1.2

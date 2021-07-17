@@ -96,9 +96,8 @@ function parseElement(el) {
   switch (el.name) {
     case "enums":
       return parseEnumElement(el);
-    case "type": {
+    case "type":
       return parseStructElement(el);
-    }
     case "commands":
       return parseCommandElement(el);
     case "extensions":
@@ -269,6 +268,7 @@ function parseExtensionMembers(parent, child) {
       // we only care about enum extensions
       else if (ch.name === "enum") {
         if (attr.dir) member.isNegative = true;
+        member.extends = attr.extends;
         member.kind = TYPES.EXTENSION_MEMBER_ENUM;
         if (attr.value) {
           member.name = attr.name;
@@ -507,9 +507,16 @@ function parseTypeElement(child) {
   });
   let text = str.join(" ");
   let staticArrayMatch = text.match(/\[([^)]+)\]/);
+  let staticArrayInArrayMatch = text.match(/\[([^)]+)\]\[([^)]+)\]/);
   let isConstant = !!text.match("const ");
   let dereferenceCount = text.split(/\*/g).length - 1;
   let raw = text.split(" ");
+  let isBitField = false;
+  if (raw.findIndex(s => s.match(":")) > 0) {
+    const index = raw.findIndex(s => s.match(":"));
+    raw.splice(index, 1);
+    isBitField = true;
+  }
   if (raw.length > 1 && !staticArrayMatch) raw.pop();
   let rawType = raw.join(" ");
   let isEnumType = enums[type] !== void 0;
@@ -525,6 +532,9 @@ function parseTypeElement(child) {
     isConstant,
     dereferenceCount
   };
+  if (isBitField) {
+    out.isBitField = true;
+  }
   if (isBitmaskType) {
     out.bitmaskType = out.rawType;
     out.rawType = out.rawType.replace(out.type, `int32_t`);
@@ -575,6 +585,16 @@ function parseTypeElement(child) {
       }
     }
   }
+  else if (staticArrayInArrayMatch) {
+    let size = staticArrayInArrayMatch[1].trim();
+    let subsize = staticArrayInArrayMatch[2].trim();
+    out.isArray = true;
+    out.length = size * subsize;
+    if (enums[out.length]) out.length = enums[out.length];
+    out.isStaticArray = true;
+    out.rawType = text.replace(name + " ", "");
+    if (type === "char") out.isString = true;
+  }
   else if (staticArrayMatch) {
     let size = staticArrayMatch[1].trim();
     out.isArray = true;
@@ -592,7 +612,7 @@ function parseTypeElement(child) {
   // a numeric array
   if (out.isArray && isNumber(type)) out.isNumericArray = true;
   // a typed array
-  if (out.isNumericArray && !out.isStaticArray) {
+  if ((out.isNumericArray && !out.isStaticArray)) {
     if (isNumericReferenceType(out.rawType)) {
       out.isTypedArray = true;
       out.jsTypedArrayName = getJavaScriptTypedArrayName(out.rawType);
@@ -620,6 +640,17 @@ function parseTypeElement(child) {
   // handle reference
   if (out.rawType === `HANDLE *`) {
     out.isWin32HandleReference = true;
+  }
+  // TODO: For now we just interpret this as raw void pointers
+  if (
+    (out.rawType === "struct null *") ||
+    (out.rawType === "const null *") ||
+    (out.rawType === "const struct null *") ||
+    (out.rawType === "struct null **")
+  ) {
+    out.type = "void";
+    out.isContantVoidPointer = out.rawType === `const void *`;
+    out.isDynamicVoidPointer = !out.isContantVoidPointer;
   }
   // function
   if (out.type.substr(0, 4) === `PFN_`) out.isFunction = true;
@@ -843,6 +874,96 @@ export default function({ xmlInput, version, docs } = _) {
       out.push(ast);
     });
   }
+  // unions
+  if (true) {
+    let results = [];
+    findXMLElements(obj, { category: "union" }, results);
+    results.map(res => {
+      let ast = parseElement(res);
+      ast.isUnionType = true;
+      out.push(ast);
+    });
+  }
+  // bitmasks
+  if (true) {
+    let results = [];
+    findXMLElements(obj, { type: "bitmask" }, results);
+    results.map(res => {
+      let ast = parseElement(res);
+      out.push(ast);
+    });
+  }
+  // enum extensions
+  if (true) {
+    let enums = out.filter(node => node.kind === "ENUM");
+    let results = [];
+    findXMLElements(obj, "require", results);
+    results.map(result => {
+      let el = { elements: [result] };
+      let extMembers = parseExtensionMembers(null, el);
+      extMembers.map(member => {
+        if (!member.extends || member.alias) return;
+        let enumToExtend = enums.filter(node => node.name === member.extends)[0] || null;
+        if (!enumToExtend) {
+          throw `Cannot resolve enum to extend '${member.extends}'`;
+        }
+        let node = {
+          kind: TYPES.ENUM_MEMBER,
+          type: "VALUE",
+          value: "" + member.value,
+          name: member.name
+        };
+        // only push extension if it doesn't exist yet
+        if (!enumToExtend.children.filter(child => child.name === member.name)[0]) {
+          enumToExtend.children.push(node);
+        }
+      });
+    });
+  }
+  // process aliased enums
+  if (true) {
+    let results = [];
+    findXMLElements(obj, { category: "enum" }, results);
+    let enums = out.filter(node => node.kind === "ENUM");
+    results.map(res => {
+      const alias = res.attributes.alias;
+      // make sure enum alias isn't created yet
+      if (alias && !(enums.filter(s => s.name === res.attributes.name)[0])) {
+        // resolve the aliased enum
+        let aliasedEnum = enums.filter(s => s.name === alias)[0];
+        if (!aliasedEnum) return warn(`Cannot resolve enum alias ${alias}`);
+        const aliasCopy = Object.assign({}, aliasedEnum);
+        aliasCopy.name = res.attributes.name;
+        registerEnum(aliasCopy);
+        out.push(aliasCopy);
+      }
+    });
+  }
+  // process aliased bitmasks
+  if (true) {
+    let results = [];
+    findXMLElements(obj, { category: "bitmask" }, results);
+    let elements = out.filter(node => node.kind === "ENUM" && node.type === "BITMASK");
+    results.map(res => {
+      const alias = res.attributes.alias;
+      // make sure bitmask alias isn't created yet
+      if (alias && !(elements.filter(s => s.name === res.attributes.name)[0])) {
+        // resolve the aliased bitmask
+        let normalizedAlias = bitmasks[alias];
+        if (!normalizedAlias) {
+          return warn(`Cannot resolve normalized bitmask alias ${normalizedAlias}`);
+        }
+        let aliasedBitmask = elements.filter(s => s.name === normalizedAlias)[0];
+        if (!aliasedBitmask) {
+          return warn(`Cannot resolve bitmask alias ${alias}`);
+        }
+        const aliasCopy = Object.assign({}, aliasedBitmask);
+        aliasCopy.name = res.attributes.name;
+        registerEnum(aliasCopy);
+        out.push(aliasCopy);
+      }
+    });
+  }
   // base extensions
   if (true) {
     let results = [];
@@ -877,25 +998,6 @@ export default function({ xmlInput, version, docs } = _) {
           }
         });
       }
-    });
-  }
-  // unions
-  if (true) {
-    let results = [];
-    findXMLElements(obj, { category: "union" }, results);
-    results.map(res => {
-      let ast = parseElement(res);
-      ast.isUnionType = true;
-      out.push(ast);
-    });
-  }
-  // bitmasks
-  if (true) {
-    let results = [];
-    findXMLElements(obj, { type: "bitmask" }, results);
-    results.map(res => {
-      let ast = parseElement(res);
-      out.push(ast);
     });
   }
   // calls
@@ -940,33 +1042,6 @@ export default function({ xmlInput, version, docs } = _) {
           }
         };
       }
-    });
-  }
-  // enum extensions
-  if (true) {
-    let enums = out.filter(node => node.kind === "ENUM");
-    let results = [];
-    findXMLElements(obj, "require", results);
-    results.map((result, index) => {
-      let el = { elements: [result] };
-      let extMembers = parseExtensionMembers(null, el);
-      extMembers.map(member => {
-        if (!member.extends || member.alias) return;
-        let enumToExtend = enums.filter(node => node.name === member.extends)[0] || null;
-        if (!enumToExtend) {
-          throw `Cannot resolve enum to extend '${member.extends}'`;
-        }
-        let node = {
-          kind: TYPES.ENUM_MEMBER,
-          type: "VALUE",
-          value: "" + member.value,
-          name: member.name
-        };
-        // only push extension if it doesn't exist yet
-        if (!enumToExtend.children.filter(child => child.name === member.name)[0]) {
-          enumToExtend.children.push(node);
-        }
-      });
     });
   }
   // funcpointers
